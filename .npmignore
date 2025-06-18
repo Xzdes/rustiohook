@@ -1,13 +1,31 @@
-target
-Cargo.lock
-.cargo
-.github
-npm
-.eslintrc
-.prettierignore
-rustfmt.toml
-yarn.lock
-*.node
-.yarn
-__test__
-renovate.json
+
+---
+
+## 📂 `.npmignore`
+
+```bash
+# Ignore source files
+Cargo.toml
+lib.rs
+*.rs
+*.lock
+__test__/
+target/
+build/
+index.spec.js
+index.d.ts
+
+# Ignore build/deploy files
+CI.yml
+.github/
+.vscode/
+
+# Ignore dev tools
+*.log
+*.md
+*.toml
+
+# Ignore CLI unless you want to publish it
+cli.js
+
+# Don't ignore actual .node files (they're built!)
