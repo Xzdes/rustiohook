@@ -1,0 +1,19 @@
+# --- Cargo.toml ---
+[package]
+edition = "2021"
+name = "rustiohook"
+version = "0.0.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2.16.0", default-features = false, features = ["napi8"] }
+napi-derive = "2.16.0"
+rdev = "0.5.3"
+
+[build-dependencies]
+napi-build = "2.1.0"
+
+[profile.release]
+lto = true
