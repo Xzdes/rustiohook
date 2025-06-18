@@ -16,8 +16,9 @@
   "scripts": {
     "test": "node __test__/index.spec.js",
     "clean": "powershell -Command \"Remove-Item -Recurse -Force target -ErrorAction SilentlyContinue\"",
+    "build": "napi build --platform --release",
     "build:debug": "npm run clean && napi build --platform && powershell -Command \"Rename-Item -Path target/debug/rustiohook.dll -NewName rustiohook.node\"",
     "rebuild:debug": "npm run build:debug",
-     "build": "npm run clean && napi build --platform --release && powershell -Command \"Move-Item -Path ${{ env.APP_NAME }}.*.node -Destination . -Force\""
-  }
+    "artifacts": "napi artifacts" 
+}
 }
