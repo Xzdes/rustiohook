@@ -1,130 +1,64 @@
-name: CI
-env:
-  APP_NAME: rustiohook
-  MACOSX_DEPLOYMENT_TARGET: '10.13'
-permissions:
-  contents: write
-  id-token: write
+name: Build, Test and Publish
 
-# --- ТРИГГЕРЫ ЗАПУСКА ---
-# Этот блок говорит, когда запускать рабочий процесс.
 on:
   push:
     branches:
-      - main # Запускать при push в главную ветку
-  release:
-    types: [created] # Запускать при создании нового релиза на GitHub
+      - main
+  pull_request:
 
 jobs:
-  # --- ЗАДАЧА СБОРКИ ---
-  # Эта задача компилирует Rust-код для разных систем.
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - host: windows-latest
-            target: x86_64-pc-windows-msvc
-          - host: macos-latest
-            target: x86_64-apple-darwin
-          - host: macos-latest
-            target: aarch64-apple-darwin
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
+  build-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
 
-    name: build-${{ matrix.settings.target }}
-    runs-on: ${{ matrix.settings.host }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Setup node
-        uses: actions/setup-node@v4
-        if: ${{ !matrix.settings.docker }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 20
-          cache: npm
+          node-version: 18
+          cache: 'npm'
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        if: ${{ !matrix.settings.docker }}
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          targets: ${{ matrix.settings.target }}
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            .cargo-cache
-            target/
-          key: ${{ matrix.settings.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          override: true
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build
-        run: npm run build # Используем наш скрипт для релизной сборки
-        if: ${{ !matrix.settings.docker }}
-        shell: bash
+      - name: Build native addon (Release)
+        run: npm run build
 
-      - name: Build in docker
-        uses: addnab/docker-run-action@v3
-        if: ${{ matrix.settings.docker }}
-        with:
-          image: ${{ matrix.settings.docker }}
-          options: '-v ${{ github.workspace }}:/build -w /build'
-          run: |
-            npm install
-            npm run build
+      - name: Run tests
+        run: node __test__/index.spec.js
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bindings-${{ matrix.settings.target }}
-          path: ${{ env.APP_NAME }}.*.node
-          if-no-files-found: error
-
-  # --- ЗАДАЧА ПУБЛИКАЦИИ ---
-  # Эта задача запускается только после успешной сборки и только при создании релиза.
   publish:
-    name: Publish
+    name: Publish to NPM
     runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'release' && github.event.action == 'created'
+    needs: build-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Setup node
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 20
-          cache: npm
-          registry-url: 'https://registry.npmjs.org/'
+          node-version: 18
+          registry-url: https://registry.npmjs.org/
 
       - name: Install dependencies
         run: npm install
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      
-      # napi-rs предоставляет скрипт 'artifacts' для подготовки пакетов
-      - name: Prepare packages for publish
-        run: npm run artifacts
+      - name: Build package
+        run: npm run build
 
       - name: Publish to NPM
-        # Публикуем каждый пакет из папки npm, которую создал napi-rs
-        run: |
-          for dir in npm/*; do
-            if [ -d "$dir" ]; then
-              npm publish "$dir" --access public
-            fi
-          done
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
